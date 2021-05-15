@@ -1,0 +1,6 @@
+[submodule "midifile"]
+	path = midifile
+	url = https://github.com/craigsapp/midifile.git
+[submodule "FFmpeg"]
+	path = FFmpeg
+	url = https://github.com/FFmpeg/FFmpeg.git
