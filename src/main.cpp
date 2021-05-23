@@ -119,10 +119,12 @@ int main(int argc, char* argv[]) {
 	}
 	writer.release();
 
+
+
 	std::stringstream ss;
 	ss << "ffmpeg -i temp.mp4 -i " << wavPath << " -pix_fmt yuv420p -c:v libx264 -c:a aac " << outputPath;
 	std::system(ss.str().c_str());
-
+	std::remove("temp.mp4");
 	return 0;
 }
 
