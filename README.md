@@ -6,6 +6,8 @@ Auto movie generator from Midi file (.mid) and Wav file (.wav)
 Windows 10
 
 ## Usage
+First, install FFmpeg (https://www.ffmpeg.org/). Type "ffmpeg" at the command prompt, and the program should start.
+
 descrive setting in .json file and run
 
 ```$midi2movie.exe input.json```
