@@ -68,27 +68,52 @@ PFD_GENERIC_ACCELERATED,
 }
 
 
-void scoreVis::render(smf::MidiFile midifile, GLubyte*& colorImage,Eigen::Matrix3d R, Eigen::Vector3d t) {
+void scoreVis::render(smf::MidiFile midifile, GLubyte*& colorImage, double time) {
 	GLint view[4];
 	{
 		InitPers(viewWidth_, viewHeight_, znear, depthResolution, intrinsic);
 		glGetIntegerv(GL_VIEWPORT, view);
+		double pos[4];
+		//noteline
+		//glBegin(GL_LINES);
+		//unsigned char linecolors[3] = { 255,255,255 };
+		////for (int track = 0; track < midifile.getTrackCount(); ++track) {
+		//for (int i = 0; i < 128; i++) {
+
+		//	m.getpos(i, 0, pos);
+		//	Eigen::Vector3d v1, v2, v3, v4;
+		//	v1 << 0, pos[0], pos[1];
+		//	v2 << dur, pos[0], pos[1];
+
+		//	v1 = R.transpose() * (v1 - t);
+		//	v2 = R.transpose() * (v2 - t);
+
+		//	glColor3ub(linecolors[0], linecolors[1], linecolors[2]);
+		//	glVertex3f(v1(0), v1(1), v1(2));
+		//	glColor3ub(linecolors[0], linecolors[1], linecolors[2]);
+		//	glVertex3f(v2(0), v2(1), v2(2));
+
+		//}
+
+		////		}
+		//glEnd();
 
         //note drawing
+
+		Eigen::Vector3d t;
+		t << time*spd+ tx_ , ty_, tz_;
+
 		glBegin(GL_TRIANGLES);
 		unsigned char trackColors[3], trackColore[3];
-        double pos[4];
+
 		for (int track = 0; track < midifile.getTrackCount(); ++track) {
 			trackColor(track, trackColors, trackColore);
 			for (int event = 0; event < midifile[track].size(); ++event) {
 				if (midifile[track][event].isNoteOn()) {
-					double dx = midifile[track][event].seconds;
-					double dy = midifile[track][event][1] * 0.05;
-					double dz = track * 0.5;
-					double length = midifile[track][event].getDurationInSeconds();
+					double dx = midifile[track][event].seconds*spd;
+					double length = midifile[track][event].getDurationInSeconds()*spd;
 
-                    m.getpos(midifile[track][event][1],track,pos);
-
+                    m->getpos(midifile[track][event][1],track,pos);
 					Eigen::Vector3d v1, v2, v3, v4;
 					v1 << dx,                   pos[0], pos[1];
 					v2 << dx,                   pos[2], pos[3];
@@ -100,26 +125,36 @@ void scoreVis::render(smf::MidiFile midifile, GLubyte*& colorImage,Eigen::Matrix
 					v3 = R.transpose() * (v3 - t);
 					v4 = R.transpose() * (v4 - t);
 
+					unsigned char rs, gs, bs;
+					unsigned char re, ge, be;
+					if (midifile[track][event].seconds <time && midifile[track][event].seconds + length > time) {
+						double rate = (time - midifile[track][event].seconds)/length;
+						rs = trackColors[0]*rate + 255*(1-rate) ;						gs = trackColors[1] * rate + 255 * (1 - rate);						bs = trackColors[2] * rate + 255 * (1 - rate);
+						re = trackColore[0] * rate + 255 * (1 - rate);						ge = trackColore[1] * rate + 255 * (1 - rate);						be = trackColore[2] * rate + 255 * (1 - rate);
+					}else {
+						rs = trackColors[0];						gs = trackColors[1];						bs = trackColors[2];
+						re = trackColore[0];						ge = trackColore[1];						be = trackColore[2];
+					}
 
-					glColor3ub(trackColors[0], trackColors[1], trackColors[2]);
+					glColor3ub(rs, gs, bs);
 					glVertex3f(v1(0), v1(1), v1(2));
-					glColor3ub(trackColors[0], trackColors[1], trackColors[2]);
+					glColor3ub(rs, gs, bs);
 					glVertex3f(v2(0), v2(1), v2(2));
-					glColor3ub(trackColore[0], trackColore[1], trackColore[2]);
+					glColor3ub(re, ge, be);
 					glVertex3f(v3(0), v3(1), v3(2));
 
-					glColor3ub(trackColors[0], trackColors[1], trackColors[2]);
+					glColor3ub(rs, gs, bs);
 					glVertex3f(v2(0), v2(1), v2(2));
-					glColor3ub(trackColore[0], trackColore[1], trackColore[2]);
+					glColor3ub(re, ge, be);
 					glVertex3f(v3(0), v3(1), v3(2));
-					glColor3ub(trackColore[0], trackColore[1], trackColore[2]);
+					glColor3ub(re, ge, be);
 					glVertex3f(v4(0), v4(1), v4(2));
-
-
 				}
 			}
 		}
 		glEnd();
+
+		
 	}
 	
 	colorImage = (GLubyte*)malloc(sizeof(GLubyte)*view[2] * view[3] * 3);
@@ -127,3 +162,87 @@ void scoreVis::render(smf::MidiFile midifile, GLubyte*& colorImage,Eigen::Matrix
 
 
 }
+
+
+
+void scoreVis::InitPers(int viewWidth, int viewHeight, double znear, double depthResolution, double* intrinsic) {
+
+	glViewport(0, 0, viewWidth, viewHeight);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glClearColor(0.0, 0.0, 0.0, 1.0);
+	glEnable(GL_DEPTH_TEST);
+
+	GLfloat m[16];
+
+	Eigen::Matrix4d m1_, r2l, rev;//projection
+	double cx = intrinsic[0];
+	double cy = intrinsic[1];
+	double fx = intrinsic[2];
+	double fy = intrinsic[3];
+	double zfar = znear + depthResolution;
+
+	m1_ <<
+		2 * fx / viewWidth, 0, -(viewWidth - 2 * cx) / viewWidth, 0,
+		0, 2 * fy / viewHeight, -(viewHeight - 2 * cy) / viewHeight, 0,
+		0, 0, (zfar + znear) / (zfar - znear), -2 * zfar*znear / (zfar - znear),
+		0, 0, 1, 0;
+
+	Eigen::Matrix4d m3 = m1_;
+
+	GLdouble m2[16];
+	memcpy(m2, m3.data(), sizeof(double) * 16);
+
+	glMultMatrixd(m2);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+
+void trackColor(int track, unsigned char* rgb, unsigned char* rgb2) {
+	HSVAngle2Color(track*1.0, rgb);
+	HSVAngle2Color(track*1.0 + 0.5, rgb2);
+}
+
+void HSVAngle2Color(double radangle, unsigned char* rgb) {
+	double pi_sixtydig = M_PI / 3;
+	double angle = ((radangle / (M_PI * 2)) - (int)(radangle / (M_PI * 2)))*(M_PI * 2);
+	if (angle >= 0 && angle < pi_sixtydig) {
+		double val = (angle - pi_sixtydig * 0) / pi_sixtydig;
+		rgb[0] = 255;
+		rgb[1] = 255 * val;
+		rgb[2] = 0;
+	}
+	else if (angle >= pi_sixtydig * 1 && angle < pi_sixtydig * 2) {
+		double val = (angle - pi_sixtydig * 1) / pi_sixtydig;
+		rgb[0] = 255 * (1 - val);
+		rgb[1] = 255;
+		rgb[2] = 0;
+	}
+	else if (angle >= pi_sixtydig * 2 && angle < pi_sixtydig * 3) {
+		double val = (angle - pi_sixtydig * 2) / pi_sixtydig;
+		rgb[0] = 0;
+		rgb[1] = 255;
+		rgb[2] = 255 * (val);
+	}
+	else if (angle >= pi_sixtydig * 3 && angle < pi_sixtydig * 4) {
+		double val = (angle - pi_sixtydig * 3) / pi_sixtydig;
+		rgb[0] = 0;
+		rgb[1] = 255 * (1 - val);
+		rgb[2] = 255;
+	}
+	else if (angle >= pi_sixtydig * 4 && angle < pi_sixtydig * 5) {
+		double val = (angle - pi_sixtydig * 4) / pi_sixtydig;
+		rgb[0] = 255 * (val);
+		rgb[1] = 0;
+		rgb[2] = 255;
+	}
+	else if (angle >= pi_sixtydig * 5 && angle < pi_sixtydig * 6) {
+		double val = (angle - pi_sixtydig * 5) / pi_sixtydig;
+		rgb[0] = 255;
+		rgb[1] = 0;
+		rgb[2] = 255 * (1 - val);
+	}
+
+
+}
+

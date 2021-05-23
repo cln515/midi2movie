@@ -9,28 +9,27 @@
 #include "Eigen/Eigen"
 #include "Eigen/Core"
 #include <sstream>
+#include <nlohmann/json.hpp>
 
-void createContext(int view_w, int view_h);
 
-void render(smf::MidiFile midifile, GLubyte*& colorImage, Eigen::Matrix3d R, Eigen::Vector3d t);
-void InitPers(int viewWidth, int viewHeight, double znear, double depthResolution, double* intrinsic);
-int viewWidth_ = 1280;
-int viewHeight_ = 720;
-double znear=0.1; 
-double depthResolution=20.0;
-double intrinsic[] = { 640, 360 ,200, 200 };
-void HSVAngle2Color(double radangle, unsigned char* rgb);
-
-void trackColor(int track, unsigned char* rgb, unsigned char* rgb2) {
-	HSVAngle2Color(track*1.0, rgb);
-	HSVAngle2Color(track*1.0+0.5, rgb2);
-}
-
-int main(int argv, char* argc[]) {
+int main(int argc, char* argv[]) {
 	std::cout << "Kitty on your lap!" << std::endl;
 
+	std::ifstream ifs(argv[1]);
+	nlohmann::json config;
+	ifs >> config;
+	ifs.close();
+	
+	std::string midiPath = config["midi"].get<std::string>();
+	std::string wavPath = config["wav"].get<std::string>();
+	std::string outputPath = config["output"].get<std::string>();
+	int mode = config["mode"].get<int>();
+	int vWidth = config["width"].get<int>();
+	int vHeight = config["height"].get<int>();
+
+	double speed = config["speed"].is_null() ?1.0 :config["speed"].get<double>();
 	smf::MidiFile midifile;
-	midifile.read(argc[1]);//file.mid
+	midifile.read(midiPath);
 	midifile.doTimeAnalysis();
 	midifile.linkNotePairs();
 	int minNote = 255;
@@ -58,18 +57,59 @@ int main(int argv, char* argc[]) {
 	std::cout << "minNote: " << minNote << std::endl;
 	std::cout << "maxNote: " << maxNote << std::endl;
 	double duration = midifile.getFileDurationInSeconds();
-	createContext(viewWidth_, viewHeight_);
+	double center = (minNote + maxNote)*0.5*0.05;
+
+	Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
+	if (!config["view"].is_null()) {
+		Eigen::Matrix3d Rx, Ry, Rz;
+		nlohmann::json viewp = config["view"].get<nlohmann::json>();
+		Rx = Eigen::AngleAxisd(viewp["rx"].get<double>(), Eigen::Vector3d::UnitX());
+		Ry = Eigen::AngleAxisd(viewp["ry"].get<double>(), Eigen::Vector3d::UnitY());
+		Rz = Eigen::AngleAxisd(viewp["rz"].get<double>(), Eigen::Vector3d::UnitZ());
+		R = Rz * Ry* Rx;
+	}
+
+	scoreVis sv;
+	if (mode == 0) {
+		double xpos = config["x"].is_null() ? 0.0 : config["x"].get<double>();
+		double ypos = config["y"].is_null() ? center : center + config["y"].get<double>();
+		double zpos = config["z"].is_null() ? -1.0 : config["z"].get<double>();
+		double zitv = config["interval"].is_null() ? 0.1 : config["interval"].get<double>();
+		sv.setMapping(new straightMapping(zitv));
+		sv.setRotation(R);
+		sv.setXYZ(xpos,ypos, zpos);
+	}
+	else if (mode == 1) {
+
+		double xpos = config["x"].is_null() ? -1.0 : config["x"].get<double>();
+		double ypos = config["y"].is_null() ? 0.0 : config["y"].get<double>();
+		double zpos = config["z"].is_null() ? 0.0 : config["z"].get<double>();
+		double zitv = config["interval"].is_null() ? 0.1 : config["interval"].get<double>();
+		double diag = config["radius"].is_null() ? 1.0 : config["radius"].get<double>();
+		double s_angle = config["startangle"].is_null() ? 0.0 : config["startangle"].get<double>();
+		double reso = config["resolution"].is_null() ? 2*M_PI/127 : config["resolution"].get<double>();
+
+		Eigen::Matrix3d Rdef;
+		Rdef = Eigen::AngleAxisd(M_PI/2.0, Eigen::Vector3d::UnitY());
+		sv.setMapping(new circleMapping(zitv, diag, s_angle, reso));
+		sv.setRotation(Rdef*R);
+		sv.setXYZ(xpos, ypos, zpos);
+	}
+	
+
+
+
+	sv.dur = duration;
+	sv.createContext(vWidth, vHeight);
 	GLubyte* buffer;
 	Eigen::Vector3d t;
-	Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
 
-	double center = (minNote + maxNote)*0.5*0.05;
+	sv.setSpeed(speed);
 	cv::VideoWriter writer;
-	writer.open("temp.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), 30, cv::Size(viewWidth_,viewHeight_));
+	writer.open("temp.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), 30, cv::Size(vWidth, vHeight));
 	for (double i = 0; i < duration; i += 1/30.0) {
-		t << i, center, -1;
-		render(midifile, buffer, R, t);
-		cv::Mat colorimage = cv::Mat(cv::Size(viewWidth_, viewHeight_), CV_8UC3);
+		sv.render(midifile, buffer, i);
+		cv::Mat colorimage = cv::Mat(cv::Size(vWidth, vHeight), CV_8UC3);
 		memcpy(colorimage.data, buffer, sizeof(uchar) * 3 * colorimage.size().width*colorimage.size().height);
 		cv::flip(colorimage, colorimage, 0);
 		cv::imshow("vis", colorimage); cv::waitKey(1);
@@ -80,7 +120,7 @@ int main(int argv, char* argc[]) {
 	writer.release();
 
 	std::stringstream ss;
-	ss << "ffmpeg -i temp.mp4 -i 0504.wav -pix_fmt yuv420p -c:v libx264 -c:a aac output2.mp4";
+	ss << "ffmpeg -i temp.mp4 -i " << wavPath << " -pix_fmt yuv420p -c:v libx264 -c:a aac " << outputPath;
 	std::system(ss.str().c_str());
 
 	return 0;
@@ -91,135 +131,4 @@ int main(int argv, char* argc[]) {
 
 
 
-void render(smf::MidiFile midifile, GLubyte*& colorImage,Eigen::Matrix3d R, Eigen::Vector3d t) {
-	GLint view[4];
-	{
-		InitPers(viewWidth_, viewHeight_, znear, depthResolution, intrinsic);
-		glGetIntegerv(GL_VIEWPORT, view);
-
-		glBegin(GL_TRIANGLES);
-		unsigned char trackColors[3], trackColore[3];
-		for (int track = 0; track < midifile.getTrackCount(); ++track) {
-			trackColor(track, trackColors, trackColore);
-			for (int event = 0; event < midifile[track].size(); ++event) {
-				if (midifile[track][event].isNoteOn()) {
-					double dx = midifile[track][event].seconds;
-					double dy = midifile[track][event][1] * 0.05;
-					double dz = track * 0.5;
-					double length = midifile[track][event].getDurationInSeconds();
-					Eigen::Vector3d v1, v2, v3, v4;
-					v1 << dx, dy, dz;
-					v2 << dx, dy+0.05, dz;
-					v3 << dx + length, dy, dz;
-					v4 << dx + length, dy+0.05, dz;
-
-					v1 = R.transpose() * (v1 - t);
-					v2 = R.transpose() * (v2 - t);
-					v3 = R.transpose() * (v3 - t);
-					v4 = R.transpose() * (v4 - t);
-
-
-					glColor3ub(trackColors[0], trackColors[1], trackColors[2]);
-					glVertex3f(v1(0), v1(1), v1(2));
-					glColor3ub(trackColors[0], trackColors[1], trackColors[2]);
-					glVertex3f(v2(0), v2(1), v2(2));
-					glColor3ub(trackColore[0], trackColore[1], trackColore[2]);
-					glVertex3f(v3(0), v3(1), v3(2));
-
-					glColor3ub(trackColors[0], trackColors[1], trackColors[2]);
-					glVertex3f(v2(0), v2(1), v2(2));
-					glColor3ub(trackColore[0], trackColore[1], trackColore[2]);
-					glVertex3f(v3(0), v3(1), v3(2));
-					glColor3ub(trackColore[0], trackColore[1], trackColore[2]);
-					glVertex3f(v4(0), v4(1), v4(2));
-
-
-				}
-			}
-		}
-		glEnd();
-	}
-	
-	colorImage = (GLubyte*)malloc(sizeof(GLubyte)*view[2] * view[3] * 3);
-	glReadPixels(view[0], view[1], view[2], view[3], GL_RGB, GL_UNSIGNED_BYTE, colorImage);
-
-
-}
-
-
-void InitPers(int viewWidth, int viewHeight, double znear, double depthResolution, double* intrinsic) {
-
-	glViewport(0, 0, viewWidth, viewHeight);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glClearColor(1.0, 1.0, 1.0, 1.0);
-	glEnable(GL_DEPTH_TEST);
-
-	GLfloat m[16];
-
-	Eigen::Matrix4d m1_, r2l, rev;//projection
-	double cx = intrinsic[0];
-	double cy = intrinsic[1];
-	double fx = intrinsic[2];
-	double fy = intrinsic[3];
-	double zfar = znear + depthResolution;
-
-	m1_ <<
-		2 * fx / viewWidth, 0, -(viewWidth - 2 * cx) / viewWidth, 0,
-		0, 2 * fy / viewHeight, -(viewHeight - 2 * cy) / viewHeight, 0,
-		0, 0, (zfar + znear) / (zfar - znear), -2 * zfar*znear / (zfar - znear),
-		0, 0, 1, 0;
-
-	Eigen::Matrix4d m3 = m1_;
-
-	GLdouble m2[16];
-	memcpy(m2, m3.data(), sizeof(double) * 16);
-
-	glMultMatrixd(m2);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-}
-
-
-void HSVAngle2Color(double radangle, unsigned char* rgb) {
-	double pi_sixtydig = M_PI / 3;
-	double angle = ((radangle / (M_PI * 2)) - (int)(radangle / (M_PI * 2)))*(M_PI * 2);
-	if (angle >= 0 && angle < pi_sixtydig) {
-		double val = (angle - pi_sixtydig * 0) / pi_sixtydig;
-		rgb[0] = 255;
-		rgb[1] = 255 * val;
-		rgb[2] = 0;
-	}
-	else if (angle >= pi_sixtydig * 1 && angle < pi_sixtydig * 2) {
-		double val = (angle - pi_sixtydig * 1) / pi_sixtydig;
-		rgb[0] = 255 * (1 - val);
-		rgb[1] = 255;
-		rgb[2] = 0;
-	}
-	else if (angle >= pi_sixtydig * 2 && angle < pi_sixtydig * 3) {
-		double val = (angle - pi_sixtydig * 2) / pi_sixtydig;
-		rgb[0] = 0;
-		rgb[1] = 255;
-		rgb[2] = 255 * (val);
-	}
-	else if (angle >= pi_sixtydig * 3 && angle < pi_sixtydig * 4) {
-		double val = (angle - pi_sixtydig * 3) / pi_sixtydig;
-		rgb[0] = 0;
-		rgb[1] = 255 * (1 - val);
-		rgb[2] = 255;
-	}
-	else if (angle >= pi_sixtydig * 4 && angle < pi_sixtydig * 5) {
-		double val = (angle - pi_sixtydig * 4) / pi_sixtydig;
-		rgb[0] = 255 * (val);
-		rgb[1] = 0;
-		rgb[2] = 255;
-	}
-	else if (angle >= pi_sixtydig * 5 && angle < pi_sixtydig * 6) {
-		double val = (angle - pi_sixtydig * 5) / pi_sixtydig;
-		rgb[0] = 255;
-		rgb[1] = 0;
-		rgb[2] = 255 * (1 - val);
-	}
-
-
-}
 
