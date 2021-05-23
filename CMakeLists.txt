@@ -20,6 +20,10 @@ add_executable(${PROJECT_NAME}
 
 )
 
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+
+set(OpenCV_STATIC ON)
 find_package(OpenCV REQUIRED)
 if(OpenCV_FOUND)
   include_directories(
