@@ -26,6 +26,11 @@ int main(int argc, char* argv[]) {
 	int mode = config["mode"].get<int>();
 	int vWidth = config["width"].get<int>();
 	int vHeight = config["height"].get<int>();
+	std::vector<std::string> encoding = config["encode_target"].get<std::vector<std::string>>();
+	if (encoding.size() == 0) {
+		std::cout << "ERROR: encode_target required!!" << std::endl;
+		return -1;
+	}
 
 	double speed = config["speed"].is_null() ?1.0 :config["speed"].get<double>();
 	smf::MidiFile midifile;
@@ -121,9 +126,25 @@ int main(int argc, char* argv[]) {
 
 
 
-	std::stringstream ss;
-	ss << "ffmpeg -i temp.mp4 -i " << wavPath << " -pix_fmt yuv420p -c:v libx264 -c:a aac " << outputPath;
-	std::system(ss.str().c_str());
+
+	if (std::find(encoding.begin(), encoding.end(), "twitter") != encoding.end())
+	{
+		std::stringstream ss;
+		ss << "ffmpeg -i temp.mp4 -i " << wavPath << " -pix_fmt yuv420p -c:v libx264 -c:a aac " << outputPath << "_twitter.mp4";
+		std::system(ss.str().c_str());
+	}
+	if (std::find(encoding.begin(), encoding.end(), "youtube") != encoding.end())
+	{
+		std::stringstream ss;
+		ss << "ffmpeg -i temp.mp4 -i " << wavPath << " -ar 48000 -ac 2 -pix_fmt yuv420p -movflags +faststart -c:v libx264 -c:a aac -profile:a aac_low -b:v 15M -b:a 384k -coder 1 -profile:v high -vf yadif=0:-1:1 -bf 2 " << outputPath << "_youtube.mp4";
+		std::system(ss.str().c_str());
+	}
+	if (std::find(encoding.begin(), encoding.end(), "instagram") != encoding.end())
+	{
+		std::stringstream ss;
+		ss << "ffmpeg -i temp.mp4 -i " << wavPath << " -pix_fmt yuv420p -c:v libx264 -c:a aac -b:v 3500 -b:a 128k " << outputPath << "_instagram.mp4";
+		std::system(ss.str().c_str());
+	}
 	std::remove("temp.mp4");
 	return 0;
 }
