@@ -31,6 +31,10 @@ int main(int argc, char* argv[]) {
 		std::cout << "ERROR: encode_target required!!" << std::endl;
 		return -1;
 	}
+	bool vis = true;
+	if (!config["vis"].is_null()) {
+		vis = config["vis"].get<bool>();
+	}
 
 	double speed = config["speed"].is_null() ?1.0 :config["speed"].get<double>();
 	smf::MidiFile midifile;
@@ -116,10 +120,12 @@ int main(int argc, char* argv[]) {
 		sv.render(midifile, buffer, i);
 		cv::Mat colorimage = cv::Mat(cv::Size(vWidth, vHeight), CV_8UC3);
 		memcpy(colorimage.data, buffer, sizeof(uchar) * 3 * colorimage.size().width*colorimage.size().height);
-		cv::flip(colorimage, colorimage, 0);
-		cv::imshow("vis", colorimage); cv::waitKey(1);
-		writer << colorimage;
+		cv::flip(colorimage, colorimage, 0);		
+		if (vis) {
+			cv::imshow("vis", colorimage); cv::waitKey(1);
+		}
 
+		writer << colorimage;
 		free(buffer);
 	}
 	writer.release();
