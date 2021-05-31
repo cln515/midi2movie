@@ -35,6 +35,17 @@ int main(int argc, char* argv[]) {
 	if (!config["vis"].is_null()) {
 		vis = config["vis"].get<bool>();
 	}
+	bool setBG = false;
+	cv::Mat bg;
+	if (!config["bg"].is_null()) {//background image loading
+		std::string bgpath = config["bg"].get<std::string>();
+		bg = cv::imread(bgpath);
+		if (!bg.empty()) {
+			setBG = true;
+			cv::resize(bg,bg,cv::Size(vWidth,vHeight));
+		}
+	}
+
 
 	double speed = config["speed"].is_null() ?1.0 :config["speed"].get<double>();
 	smf::MidiFile midifile;
@@ -120,7 +131,22 @@ int main(int argc, char* argv[]) {
 		sv.render(midifile, buffer, i);
 		cv::Mat colorimage = cv::Mat(cv::Size(vWidth, vHeight), CV_8UC3);
 		memcpy(colorimage.data, buffer, sizeof(uchar) * 3 * colorimage.size().width*colorimage.size().height);
-		cv::flip(colorimage, colorimage, 0);		
+		cv::flip(colorimage, colorimage, 0);	
+		
+		//Background image blending
+		if (setBG) {
+			uchar* ci_ptr = colorimage.data;
+			uchar* bg_ptr = bg.data;
+			int areasize = colorimage.size().area();
+			for (int pix = 0; pix < areasize; pix++) {
+				if (ci_ptr[pix * 3] == 0 && ci_ptr[pix * 3 + 1] == 0 && ci_ptr[pix * 3 + 2] == 0) {
+					ci_ptr[pix * 3] = bg_ptr[pix * 3];
+					ci_ptr[pix * 3 + 1] = bg_ptr[pix * 3 + 1];
+					ci_ptr[pix * 3 + 2] = bg_ptr[pix * 3 + 2];
+				}
+				//else: Todo alpha blending
+			}
+		}
 		if (vis) {
 			cv::imshow("vis", colorimage); cv::waitKey(1);
 		}
