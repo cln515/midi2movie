@@ -7,6 +7,7 @@ class mapping{
 public:
 	mapping() {};
     virtual void getpos(int note,int track,double* posinfo);
+	virtual void getpos(double freq, double* posinfo);
 
 private:
 };
@@ -17,6 +18,7 @@ public:
 		zitv = zitv_;
 	};
 	void getpos(int note, int track, double* posinfo);
+	void getpos(double freq, double* posinfo);
 	double zitv = 0.5;
 };
 
@@ -30,6 +32,7 @@ public:
 		resolution = resolution_;
 	};
 	void getpos(int note, int track, double* posinfo);
+	void getpos(double freq, double* posinfo);
 	double zitv = 0.05;
 	double diag = 1.0;
 	double startAngle = 0;

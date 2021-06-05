@@ -26,7 +26,14 @@ public:
 	void setSpeed(double speed) {
 		spd = speed;
 	}
+	void setSpectrum(double* buffer, int n,int minf,int maxf) {
+		setSpec = true;
+		spectrum = buffer;
+		specLen = n;
+		minf_idx = minf;
+		maxf_idx = maxf;
 
+	}
 
 	mapping* m;
 	Eigen::Matrix3d R;
@@ -42,6 +49,10 @@ public:
 	double intrinsic[4] = { 640, 360 ,200, 200 };
 
 	double dur = 0;
+	bool setSpec = false;
+	double* spectrum;
+	int specLen=0;
+	int minf_idx,maxf_idx;
 };
 
 void HSVAngle2Color(double radangle, unsigned char* rgb);

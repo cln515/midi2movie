@@ -4,3 +4,9 @@
 [submodule "FFmpeg"]
 	path = FFmpeg
 	url = https://github.com/FFmpeg/FFmpeg.git
+[submodule "aquila"]
+	path = aquila
+	url = https://github.com/zsiciarz/aquila.git
+[submodule "q"]
+	path = q
+	url = https://github.com/cycfi/q.git

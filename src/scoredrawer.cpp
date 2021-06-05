@@ -73,31 +73,34 @@ void scoreVis::render(smf::MidiFile midifile, GLubyte*& colorImage, double time)
 	{
 		InitPers(viewWidth_, viewHeight_, znear, depthResolution, intrinsic);
 		glGetIntegerv(GL_VIEWPORT, view);
-		double pos[4];
-		//noteline
-		//glBegin(GL_LINES);
-		//unsigned char linecolors[3] = { 255,255,255 };
-		////for (int track = 0; track < midifile.getTrackCount(); ++track) {
-		//for (int i = 0; i < 128; i++) {
+		double pos[6];
+		Eigen::Vector3d t_fix;
+		t_fix << tx_, ty_, tz_;
+		//spectrum
+		if (setSpec) {
+			glBegin(GL_LINES);
+			unsigned char linecolors[3] = { 255,255,255 };
+			for (int i = minf_idx; i <= maxf_idx; i++) {
 
-		//	m.getpos(i, 0, pos);
-		//	Eigen::Vector3d v1, v2, v3, v4;
-		//	v1 << 0, pos[0], pos[1];
-		//	v2 << dur, pos[0], pos[1];
+				Eigen::Vector3d v1, v2, v3, v4;
+				double specpower = 10*log10( sqrt(spectrum[i] * spectrum[i])/specLen + 1);//base power setting
+				m->getpos((double)i/(maxf_idx- minf_idx), pos);
 
-		//	v1 = R.transpose() * (v1 - t);
-		//	v2 = R.transpose() * (v2 - t);
 
-		//	glColor3ub(linecolors[0], linecolors[1], linecolors[2]);
-		//	glVertex3f(v1(0), v1(1), v1(2));
-		//	glColor3ub(linecolors[0], linecolors[1], linecolors[2]);
-		//	glVertex3f(v2(0), v2(1), v2(2));
+				v1 << pos[0], pos[1], pos[2];
+				v2 << pos[0] + specpower * pos[3], pos[1] + specpower * pos[4], pos[2]+ specpower * pos[5];
 
-		//}
+				//v1 = R.transpose() * (v1-t_fix);
+				//v2 = R.transpose() * (v2 - t_fix);
 
-		////		}
-		//glEnd();
+				glColor3ub(linecolors[0], linecolors[1], linecolors[2]);
+				glVertex3f(v1(0), v1(1), v1(2));
+				glColor3ub(linecolors[0], linecolors[1], linecolors[2]);
+				glVertex3f(v2(0), v2(1), v2(2));
 
+			}
+			glEnd();
+		}
         //note drawing
 
 		Eigen::Vector3d t;

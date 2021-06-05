@@ -11,6 +11,10 @@
 #include <sstream>
 #include <nlohmann/json.hpp>
 
+#include <q/support/literals.hpp>
+#include <q_io/audio_stream.hpp>
+#include <q_io/audio_file.hpp>
+#include <q/fft/fft.hpp>
 
 int main(int argc, char* argv[]) {
 	std::cout << "Kitty on your lap!" << std::endl;
@@ -22,6 +26,46 @@ int main(int argc, char* argv[]) {
 	
 	std::string midiPath = config["midi"].get<std::string>();
 	std::string wavPath = config["wav"].get<std::string>();
+	
+	bool bSpec = true;
+	if (!config["spec"].is_null()) {
+		bSpec = config["spec"].get<bool>();
+	}
+	cycfi::q::wav_reader wav{ wavPath };
+	bool bMono = (wav.num_channels() == 1);
+	int ch = wav.num_channels();
+	constexpr std::size_t p = 11;
+	constexpr std::size_t n = 1 << p;
+	
+	float* buf;
+	float* wavbuf;
+	int wavbuf_length = wav.length() / ch;
+	int minfreq_idx,maxfreq_idx;
+	if (bSpec) {
+		std::cout << "\nLength: " << wav.length();
+		std::cout << "\nSample frequency: " << wav.sps() << " Hz";
+		std::cout << "\nChannels: " << wav.num_channels() << std::endl;
+		
+		int bufnum = n * ch;
+		buf = (float*)malloc(sizeof(float)*bufnum);
+		
+		std::size_t loaded;
+		wavbuf = (float*)malloc(sizeof(float)*wav.length() / ch);
+		int cnt = 0;
+
+		while ((loaded = wav.read(buf, bufnum)) != 0) {
+			for (int i = 0; i < loaded / ch; ++i)
+			{
+				if (bMono)wavbuf[cnt] = buf[i];
+				else wavbuf[cnt] = (buf[i * 2] + buf[i * 2] + 1) / ch;
+				cnt++;
+			}
+		}
+		double minfreq = 60;
+		double maxfreq = 4000;
+		minfreq_idx = minfreq / (wav.sps() / n);
+		maxfreq_idx = maxfreq / (wav.sps() / n);
+	}
 	std::string outputPath = config["output"].get<std::string>();
 	int mode = config["mode"].get<int>();
 	int vWidth = config["width"].get<int>();
@@ -127,7 +171,21 @@ int main(int argc, char* argv[]) {
 	sv.setSpeed(speed);
 	cv::VideoWriter writer;
 	writer.open("temp.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), 30, cv::Size(vWidth, vHeight));
+	double fftbuffer[2 * n];
 	for (double i = 0; i < duration; i += 1/30.0) {
+		if (bSpec) {
+			double time = i;
+			int bufidx = time * wav.sps();
+			for (int j = 0; j < n * 2; j++) {
+				if (j + bufidx >= wavbuf_length) {
+					fftbuffer[j] = wavbuf[wavbuf_length-1] ;
+				}
+				else fftbuffer[j] = wavbuf[j + bufidx];
+			}
+			cycfi::q::fft<n>(fftbuffer);
+			sv.setSpectrum(fftbuffer,n,minfreq_idx,maxfreq_idx);
+		}
+
 		sv.render(midifile, buffer, i);
 		cv::Mat colorimage = cv::Mat(cv::Size(vWidth, vHeight), CV_8UC3);
 		memcpy(colorimage.data, buffer, sizeof(uchar) * 3 * colorimage.size().width*colorimage.size().height);
@@ -162,19 +220,19 @@ int main(int argc, char* argv[]) {
 	if (std::find(encoding.begin(), encoding.end(), "twitter") != encoding.end())
 	{
 		std::stringstream ss;
-		ss << "ffmpeg -i temp.mp4 -i " << wavPath << " -pix_fmt yuv420p -c:v libx264 -c:a aac " << outputPath << "_twitter.mp4";
+		ss << "ffmpeg -y -i temp.mp4 -i " << wavPath << " -pix_fmt yuv420p -c:v libx264 -c:a aac " << outputPath << "_twitter.mp4";
 		std::system(ss.str().c_str());
 	}
 	if (std::find(encoding.begin(), encoding.end(), "youtube") != encoding.end())
 	{
 		std::stringstream ss;
-		ss << "ffmpeg -i temp.mp4 -i " << wavPath << " -ar 48000 -ac 2 -pix_fmt yuv420p -movflags +faststart -c:v libx264 -c:a aac -profile:a aac_low -b:v 15M -b:a 384k -coder 1 -profile:v high -vf yadif=0:-1:1 -bf 2 " << outputPath << "_youtube.mp4";
+		ss << "ffmpeg -y -i temp.mp4 -i " << wavPath << " -ar 48000 -ac 2 -pix_fmt yuv420p -movflags +faststart -c:v libx264 -c:a aac -profile:a aac_low -b:v 15M -b:a 384k -coder 1 -profile:v high -vf yadif=0:-1:1 -bf 2 " << outputPath << "_youtube.mp4";
 		std::system(ss.str().c_str());
 	}
 	if (std::find(encoding.begin(), encoding.end(), "instagram") != encoding.end())
 	{
 		std::stringstream ss;
-		ss << "ffmpeg -i temp.mp4 -i " << wavPath << " -pix_fmt yuv420p -c:v libx264 -c:a aac -b:v 3500 -b:a 128k " << outputPath << "_instagram.mp4";
+		ss << "ffmpeg -y -i temp.mp4 -i " << wavPath << " -pix_fmt yuv420p -c:v libx264 -c:a aac -b:v 3500 -b:a 128k " << outputPath << "_instagram.mp4";
 		std::system(ss.str().c_str());
 	}
 	std::remove("temp.mp4");
