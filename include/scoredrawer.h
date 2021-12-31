@@ -32,8 +32,12 @@ public:
 		specLen = n;
 		minf_idx = minf;
 		maxf_idx = maxf;
-
 	}
+	void setLineColor(unsigned char* linecolors_) {
+		linecolors = linecolors_;
+	};
+
+	unsigned char* linecolors;
 
 	mapping* m;
 	Eigen::Matrix3d R;

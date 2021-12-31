@@ -78,8 +78,8 @@ void scoreVis::render(smf::MidiFile midifile, GLubyte*& colorImage, double time)
 		t_fix << tx_, ty_, tz_;
 		//spectrum
 		if (setSpec) {
+			glLineWidth(3.0);
 			glBegin(GL_LINES);
-			unsigned char linecolors[3] = { 255,255,255 };
 			for (int i = minf_idx; i <= maxf_idx; i++) {
 
 				Eigen::Vector3d v1, v2, v3, v4;

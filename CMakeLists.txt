@@ -13,6 +13,7 @@ add_executable(${PROJECT_NAME}
 	src/main.cpp
 	src/scoredrawer.cpp
 	src/mapping.cpp
+	src/textdrawer.cpp
 	
 	midifile/src/MidiFile.cpp
 	midifile/src/MidiEvent.cpp
@@ -60,3 +61,7 @@ include_directories(
 find_package(nlohmann_json 3.2.0 REQUIRED)
 target_link_libraries(${PROJECT_NAME} nlohmann_json::nlohmann_json)
 
+
+find_package(Freetype REQUIRED)
+target_link_libraries(${PROJECT_NAME} ${FREETYPE_LIBRARIES})
+include_directories(${FREETYPE_INCLUDE_DIRS})

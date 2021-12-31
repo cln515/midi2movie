@@ -16,6 +16,14 @@
 #include <q_io/audio_file.hpp>
 #include <q/fft/fft.hpp>
 
+#include <stdio.h>
+#include <math.h>
+#include <codecvt>
+#include <string>
+#include <iostream>
+#include <locale>
+#include <textdrawer.h>
+
 int main(int argc, char* argv[]) {
 	std::cout << "Kitty on your lap!" << std::endl;
 	//load config file
@@ -34,6 +42,7 @@ int main(int argc, char* argv[]) {
 	scoreVis sv;
 	smf::MidiFile midifile;
 	double duration = 0.0;
+	double midialpha = 1.0;
 	if (!config["midi"].is_null()) {
 		nlohmann::json config_midi = config["midi"];
 
@@ -50,7 +59,6 @@ int main(int argc, char* argv[]) {
 		for (int track = 0; track < midifile.getTrackCount(); ++track) {
 			for (int event = 0; event < midifile[track].size(); ++event) {
 				if (midifile[track][event].isNoteOn()) {
-					std::cout << midifile[track][event].seconds << std::endl;
 					int note = midifile[track][event][1];
 					if (note < minNote) {
 						minNote = note;
@@ -60,7 +68,6 @@ int main(int argc, char* argv[]) {
 					}
 				}
 			}
-			std::cout << std::endl;
 		}
 
 
@@ -77,6 +84,9 @@ int main(int argc, char* argv[]) {
 			Ry = Eigen::AngleAxisd(viewp["ry"].get<double>(), Eigen::Vector3d::UnitY());
 			Rz = Eigen::AngleAxisd(viewp["rz"].get<double>(), Eigen::Vector3d::UnitZ());
 			R = Rz * Ry* Rx;
+		}
+		if (!config_midi["alpha"].is_null()) {
+			midialpha = config_midi["alpha"].get<double>();
 		}
 
 		if (mode == 0) {
@@ -114,9 +124,17 @@ int main(int argc, char* argv[]) {
 
 	std::string wavPath = config["wav"].get<std::string>();
 	
-	bool bSpec = true;
+	bool bSpec = false;
+	unsigned char spectolColor[] = {255,255,255};
 	if (!config["spec"].is_null()) {
-		bSpec = config["spec"].get<bool>();
+		if (!config["spec"]["color"].is_null()) {
+			std::vector<int> specc = config["spec"]["color"].get<std::vector<int>>();
+			spectolColor[0] = specc[0];
+			spectolColor[1] = specc[1];
+			spectolColor[2] = specc[2];
+		}
+		sv.setLineColor(spectolColor);
+		bSpec = true;
 	}
 	cycfi::q::wav_reader wav{ wavPath };
 	bool bMono = (wav.num_channels() == 1);
@@ -164,6 +182,8 @@ int main(int argc, char* argv[]) {
 	if (!config["vis"].is_null()) {
 		vis = config["vis"].get<bool>();
 	}
+
+	//back ground =======================
 	bool setBG = false;
 
 	std::vector<nlohmann::json> sources;
@@ -174,6 +194,7 @@ int main(int argc, char* argv[]) {
 
 	std::vector<cv::Mat> bg(sources.size());
 	std::vector <double> dulations_bg(sources.size());
+	std::vector <double> transition_duration(sources.size());
 	int bg_idx = 0;
 	if (setBG) {//background image loading
 		for (int i = 0; i < sources.size(); i++) {
@@ -185,14 +206,72 @@ int main(int argc, char* argv[]) {
 			else {
 				dulations_bg[i] = (-1);
 			}
+			if (!sources.at(i)["transition"].is_null()) {
+				transition_duration[i] = (sources.at(i)["transition"].get<double>());
+			}
+			else {
+				transition_duration[i] = (1.0);
+			}
 		}
 	}
 
+	//text
+	//std::vector<nlohmann::json> txt_sources,disp_txts;
+	nlohmann::json textdata;
+	int txtinx = 0;
+	bool settxt=false;
+	textDrawer td;
+	std::string fontpath;
+	int fontSize=20;
+	int lineWidth = 10;
+	int textx=0, texty=0;
+	uchar colorbgr[3] = {255,255,255};
+	uchar textbgbgr[3] = { 0,0,0 };
+	double timeoffset = 0.0;
+	if (!config["text"].is_null()) {//background image loading
+		std::ifstream ifs_ts(config["text"].get<std::string>());
+		ifs_ts >> textdata;
+		ifs_ts.close();
 
+		fontpath = textdata["font"].get<std::string>();
+		if (!textdata["fontsize"].is_null())fontSize = textdata["fontsize"].get<int>();
+		if (!textdata["line_interval"].is_null())lineWidth = textdata["line_interval"].get<int>();
+		settxt = true;
+		textx = textdata["x"];
+		texty = textdata["y"];
+		if (!textdata["color"].is_null()) {
+			std::vector<int> c = textdata["color"].get<std::vector<int>>();
+			colorbgr[0] = c.at(0);
+			colorbgr[1] = c.at(1);
+			colorbgr[2] = c.at(2);
+		}
+		if (!textdata["back"].is_null()) {
+			double alpha = 1.0;
+			if (!textdata["back"]["color"].is_null()) {
+				std::vector<int> c = textdata["back"]["color"].get<std::vector<int>>();
+				textbgbgr[0] = c.at(0);
+				textbgbgr[1] = c.at(1);
+				textbgbgr[2] = c.at(2);
+			}if (!textdata["back"]["alpha"].is_null()) {
+				alpha = textdata["back"]["alpha"].get<double>();
+			}
+			td.setBackDrawing(colorbgr, 1.0);
+		}
+		if(!textdata["timeoffset"].is_null()) {
+			timeoffset = textdata["timeoffset"].get<double>();
+		}
+		if (!td.init(fontpath, fontSize, lineWidth))return -1;
+	}
 
-
-
-
+	/*{
+		cv::Mat image_cv= cv::Mat::zeros(300, 500, CV_8UC3);
+		cv::Rect ROI(20,20,300,500);
+		uchar rgb[] = { 255,255,255 };
+		td.draw(image_cv, ROI,rgb);
+		cv::imshow("output", image_cv);
+		cv::waitKey(0);
+		return 0;
+	}*/
 	
 	GLubyte* buffer;
 	Eigen::Vector3d t;
@@ -228,10 +307,12 @@ int main(int argc, char* argv[]) {
 			uchar* bg_ptr = bg.at(bg_idx).data;
 			uchar* bg_ptr_next = bg.at(bg_idx).data; //bg.at(bg_idx).data;
 			double blend_rate = 1.0;
-			if (dulations_bg.at(bg_idx) != -1 && dulations_bg.at(bg_idx) - i < 1.0) {
+			double trans_dur = transition_duration.at(bg_idx);
+			if (dulations_bg.at(bg_idx) != -1 && dulations_bg.at(bg_idx) - i < trans_dur) {
 				bg_ptr_next = bg.at(bg_idx+1).data;
-				blend_rate = dulations_bg.at(bg_idx) - i;
+				blend_rate = (dulations_bg.at(bg_idx) - i)/ trans_dur;
 				if (blend_rate < 0)blend_rate = 0;
+//				if (blend_rate > 1)blend_rate = 1;
 			}
 
 			int areasize = colorimage.size().area();
@@ -244,13 +325,45 @@ int main(int argc, char* argv[]) {
 					ci_ptr[pix * 3 + 2] = blend_rate * bg_ptr[pix * 3 + 2] +
 						(1.0 - blend_rate) * bg_ptr_next[pix * 3 + 2];
 				}
-				//else: Todo alpha blending
+				else if (midialpha < 1.0) {
+					ci_ptr[pix * 3] = (1-midialpha)*(blend_rate * bg_ptr[pix * 3] +
+						(1.0 - blend_rate) * bg_ptr_next[pix * 3]) + midialpha * ci_ptr[pix * 3];
+					ci_ptr[pix * 3 + 1] = (1 - midialpha)*(blend_rate * bg_ptr[pix * 3 + 1] +
+						(1.0 - blend_rate) * bg_ptr_next[pix * 3 + 1])+ midialpha * ci_ptr[pix * 3+1];
+					ci_ptr[pix * 3 + 2] = (1 - midialpha)*(blend_rate * bg_ptr[pix * 3 + 2] +
+						(1.0 - blend_rate) * bg_ptr_next[pix * 3 + 2])+ midialpha * ci_ptr[pix * 3 + 2];
+				}
 			}
 
 			if (dulations_bg.at(bg_idx) != -1 && dulations_bg.at(bg_idx) - i < 0.0) {
 				bg_idx++;
 			}
 		}
+		if(settxt && txtinx < textdata["data"].size()) {
+			if (!textdata["data"][txtinx]["end"].is_null()) {
+				while (textdata["data"][txtinx]["end"].get<double>() + timeoffset < i) {
+					txtinx++;
+					if (txtinx >= textdata["data"].size())break;
+				}
+			}
+			if (txtinx < textdata["data"].size()) {
+				std::string str = textdata["data"][txtinx]["string"].get<std::string>();
+				wchar_t str2[512];
+				char str3[512];
+
+				MultiByteToWideChar(CP_UTF8, 0, str.c_str(), strlen(str.c_str()) + 1, str2, MAX_PATH);
+				WideCharToMultiByte(CP_ACP, 0, str2, sizeof(str2) / sizeof(str2[0]), str3, sizeof(str3), NULL, NULL);
+
+				std::cout << str3 << std::endl;;
+				td.draw(colorimage, str,cv::Rect(textx,texty,100,100),colorbgr);
+			}
+
+		}
+
+
+
+
+
 		if (vis) {
 			cv::imshow("vis", colorimage); cv::waitKey(1);
 		}
