@@ -33,16 +33,86 @@ int main(int argc, char* argv[]) {
 	ifs.close();
 	
 
-	bool bMidiDraw = false;
 	int vWidth = config["width"].get<int>();
 	int vHeight = config["height"].get<int>();
+	double duration = 0.0;
+	scoreVis sv;
+	//load spectol parameter
 
+	std::string wavPath = config["wav"].get<std::string>();
+
+
+	cycfi::q::wav_reader wav{ wavPath };
+	bool bMono = (wav.num_channels() == 1);
+	int ch = wav.num_channels();
+	constexpr std::size_t p = 11;
+	constexpr std::size_t n = 1 << p;
+
+	float* buf;
+	float* wavbuf;
+	int wavbuf_length = wav.length() / ch;
+	int minfreq_idx, maxfreq_idx;
+	{
+		std::cout << "\nLength: " << wav.length();
+		std::cout << "\nSample frequency: " << wav.sps() << " Hz";
+		std::cout << "\nChannels: " << wav.num_channels() << std::endl;
+		std::cout << "\nlength(s): " << wav.length()/ (float)(wav.sps() * wav.num_channels()) << std::endl;
+		duration= wav.length() / (float)(wav.sps() * wav.num_channels());
+		int bufnum = n * ch;
+		buf = (float*)malloc(sizeof(float)*bufnum);
+
+		std::size_t loaded;
+		wavbuf = (float*)malloc(sizeof(float)*wav.length() / ch);
+		int cnt = 0;
+
+		while ((loaded = wav.read(buf, bufnum)) != 0) {
+			for (int i = 0; i < loaded / ch; ++i)
+			{
+				if (bMono)wavbuf[cnt] = buf[i];
+				else wavbuf[cnt] = (buf[i * 2] + buf[i * 2] + 1) / ch;
+				cnt++;
+			}
+		}
+		double minfreq = 60;
+		double maxfreq = 4000;
+		minfreq_idx = minfreq / (wav.sps() / n);
+		maxfreq_idx = maxfreq / (wav.sps() / n);
+	}
+
+
+	bool bSpec = false;
+	unsigned char spectolColor[] = { 255,255,255 };
+	if (!config["spec"].is_null()) {
+		if (!config["spec"]["color"].is_null()) {
+			std::vector<int> specc = config["spec"]["color"].get<std::vector<int>>();
+			spectolColor[0] = specc[0];
+			spectolColor[1] = specc[1];
+			spectolColor[2] = specc[2];
+		}
+		sv.setLineColor(spectolColor);
+		bSpec = true;
+
+		int mode = config["spec"]["mode"].get<int>();
+
+		if (mode == 0) {
+			sv.setSpecMapping(new straightMapping(0.1));
+		}
+		else if (mode == 1) {
+			double zitv = 0.1;
+			double diag = 1.0;
+			double s_angle = 0.0;
+			double reso = 1.0;
+			sv.setSpecMapping(new circleMapping(zitv, diag, s_angle, reso));
+		}
+	}
+
+
+
+	bool bMidiDraw = false;
+	double midialpha = 1.0;
 
 	//load midi parameter
-	scoreVis sv;
 	smf::MidiFile midifile;
-	double duration = 0.0;
-	double midialpha = 1.0;
 	if (!config["midi"].is_null()) {
 		nlohmann::json config_midi = config["midi"];
 
@@ -74,7 +144,7 @@ int main(int argc, char* argv[]) {
 		std::cout << "duration: " << midifile.getFileDurationInSeconds() << std::endl;
 		std::cout << "minNote: " << minNote << std::endl;
 		std::cout << "maxNote: " << maxNote << std::endl;
-		 duration = midifile.getFileDurationInSeconds();
+		// duration = midifile.getFileDurationInSeconds();
 		double center = (minNote + maxNote)*0.5*0.05;
 		Eigen::Matrix3d R = Eigen::Matrix3d::Identity();
 		if (!config_midi["view"].is_null()) {
@@ -112,65 +182,20 @@ int main(int argc, char* argv[]) {
 			sv.setMapping(new circleMapping(zitv, diag, s_angle, reso));
 			sv.setRotation(Rdef*R);
 			sv.setXYZ(xpos, ypos, zpos);
+
 		}
+		sv.setSpeed(speed);
+	}
+
+	//context creation
+	{
 		sv.dur = duration;
 		sv.createContext(vWidth, vHeight);
-		sv.setSpeed(speed);
-
 	}
 
 
-	//load spectol parameter
 
-	std::string wavPath = config["wav"].get<std::string>();
-	
-	bool bSpec = false;
-	unsigned char spectolColor[] = {255,255,255};
-	if (!config["spec"].is_null()) {
-		if (!config["spec"]["color"].is_null()) {
-			std::vector<int> specc = config["spec"]["color"].get<std::vector<int>>();
-			spectolColor[0] = specc[0];
-			spectolColor[1] = specc[1];
-			spectolColor[2] = specc[2];
-		}
-		sv.setLineColor(spectolColor);
-		bSpec = true;
-	}
-	cycfi::q::wav_reader wav{ wavPath };
-	bool bMono = (wav.num_channels() == 1);
-	int ch = wav.num_channels();
-	constexpr std::size_t p = 11;
-	constexpr std::size_t n = 1 << p;
-	
-	float* buf;
-	float* wavbuf;
-	int wavbuf_length = wav.length() / ch;
-	int minfreq_idx,maxfreq_idx;
-	if (bSpec) {
-		std::cout << "\nLength: " << wav.length();
-		std::cout << "\nSample frequency: " << wav.sps() << " Hz";
-		std::cout << "\nChannels: " << wav.num_channels() << std::endl;
-		
-		int bufnum = n * ch;
-		buf = (float*)malloc(sizeof(float)*bufnum);
-		
-		std::size_t loaded;
-		wavbuf = (float*)malloc(sizeof(float)*wav.length() / ch);
-		int cnt = 0;
 
-		while ((loaded = wav.read(buf, bufnum)) != 0) {
-			for (int i = 0; i < loaded / ch; ++i)
-			{
-				if (bMono)wavbuf[cnt] = buf[i];
-				else wavbuf[cnt] = (buf[i * 2] + buf[i * 2] + 1) / ch;
-				cnt++;
-			}
-		}
-		double minfreq = 60;
-		double maxfreq = 4000;
-		minfreq_idx = minfreq / (wav.sps() / n);
-		maxfreq_idx = maxfreq / (wav.sps() / n);
-	}
 	std::string outputPath = config["output"].get<std::string>();
 	
 	std::vector<std::string> encoding = config["encode_target"].get<std::vector<std::string>>();
@@ -272,7 +297,8 @@ int main(int argc, char* argv[]) {
 		cv::waitKey(0);
 		return 0;
 	}*/
-	
+
+	//start rendering======================
 	GLubyte* buffer;
 	Eigen::Vector3d t;
 
@@ -280,6 +306,7 @@ int main(int argc, char* argv[]) {
 	writer.open("temp.mp4", cv::VideoWriter::fourcc('m', 'p', '4', 'v'), 30, cv::Size(vWidth, vHeight));
 	double fftbuffer[2 * n];
 	for (double i = 0; i < duration; i += 1/30.0) {
+		sv.setView();
 		if (bSpec) {
 			double time = i;
 			int bufidx = time * wav.sps();
@@ -291,16 +318,17 @@ int main(int argc, char* argv[]) {
 			}
 			cycfi::q::fft<n>(fftbuffer);
 			sv.setSpectrum(fftbuffer,n,minfreq_idx,maxfreq_idx);
+			sv.render_spectrum();
 		}
 
 		cv::Mat colorimage = cv::Mat(cv::Size(vWidth, vHeight), CV_8UC3, cv::Scalar(0));
 
 		if (bMidiDraw) {
-			sv.render(midifile, buffer, i);
-			memcpy(colorimage.data, buffer, sizeof(uchar) * 3 * colorimage.size().width*colorimage.size().height);
-			cv::flip(colorimage, colorimage, 0);
+			sv.render(midifile, i);
 		}
-		
+		sv.bufferCopy(buffer);
+		memcpy(colorimage.data, buffer, sizeof(uchar) * 3 * colorimage.size().width*colorimage.size().height);
+		cv::flip(colorimage, colorimage, 0);
 		//Background image blending
 		if (setBG) {
 			uchar* ci_ptr = colorimage.data;
@@ -343,7 +371,7 @@ int main(int argc, char* argv[]) {
 			if (!textdata["data"][txtinx]["end"].is_null()) {
 				while (textdata["data"][txtinx]["end"].get<double>() + timeoffset < i) {
 					txtinx++;
-					if (txtinx >= textdata["data"].size())break;
+					if (txtinx >= textdata["data"].size() || textdata["data"][txtinx]["end"].is_null())break;
 				}
 			}
 			if (txtinx < textdata["data"].size()) {
@@ -354,7 +382,6 @@ int main(int argc, char* argv[]) {
 				MultiByteToWideChar(CP_UTF8, 0, str.c_str(), strlen(str.c_str()) + 1, str2, MAX_PATH);
 				WideCharToMultiByte(CP_ACP, 0, str2, sizeof(str2) / sizeof(str2[0]), str3, sizeof(str3), NULL, NULL);
 
-				std::cout << str3 << std::endl;;
 				td.draw(colorimage, str,cv::Rect(textx,texty,100,100),colorbgr);
 			}
 
@@ -388,12 +415,12 @@ int main(int argc, char* argv[]) {
 		ss << "ffmpeg -y -i temp.mp4 -i " << wavPath << " -ar 48000 -ac 2 -pix_fmt yuv420p -movflags +faststart -c:v libx264 -c:a aac -profile:a aac_low -b:v 15M -b:a 384k -coder 1 -profile:v high -vf yadif=0:-1:1 -bf 2 " << outputPath << "_youtube.mp4";
 		std::system(ss.str().c_str());
 	}
-	if (std::find(encoding.begin(), encoding.end(), "instagram") != encoding.end())
-	{
-		std::stringstream ss;
-		ss << "ffmpeg -y -i temp.mp4 -i " << wavPath << " -pix_fmt yuv420p -c:v libx264 -c:a aac -b:v 3500 -b:a 128k " << outputPath << "_instagram.mp4";
-		std::system(ss.str().c_str());
-	}
+	//if (std::find(encoding.begin(), encoding.end(), "instagram") != encoding.end())
+	//{
+	//	std::stringstream ss;
+	//	ss << "ffmpeg -y -i temp.mp4 -i " << wavPath << " -pix_fmt yuv420p -c:v libx264 -c:a aac -b:v 3500 -b:a 128k " << outputPath << "_instagram.mp4";
+	//	std::system(ss.str().c_str());
+	//}
 	std::remove("temp.mp4");
 	return 0;
 }

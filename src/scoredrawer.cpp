@@ -67,40 +67,47 @@ PFD_GENERIC_ACCELERATED,
 	::wglMakeCurrent(_hdc_, _hrc);
 }
 
+void scoreVis::setView() {
+	InitPers(viewWidth_, viewHeight_, znear, depthResolution, intrinsic);
+}
 
-void scoreVis::render(smf::MidiFile midifile, GLubyte*& colorImage, double time) {
-	GLint view[4];
+void scoreVis::render_spectrum() {
+	if (setSpec) {
+		double pos[6];
+		glLineWidth(3.0);
+		glBegin(GL_LINES);
+		for (int i = minf_idx; i <= maxf_idx; i++) {
+
+			Eigen::Vector3d v1, v2, v3, v4;
+			double specpower = 10 * log10(sqrt(spectrum[i] * spectrum[i]) / specLen + 1);//base power setting
+			m_f->getpos((double)i / (maxf_idx - minf_idx), pos);
+
+
+			v1 << pos[0], pos[1], pos[2];
+			v2 << pos[0] + specpower * pos[3], pos[1] + specpower * pos[4], pos[2] + specpower * pos[5];
+
+			//v1 = R.transpose() * (v1-t_fix);
+			//v2 = R.transpose() * (v2 - t_fix);
+
+			glColor3ub(linecolors[0], linecolors[1], linecolors[2]);
+			glVertex3f(v1(0), v1(1), v1(2));
+			glColor3ub(linecolors[0], linecolors[1], linecolors[2]);
+			glVertex3f(v2(0), v2(1), v2(2));
+
+		}
+		glEnd();
+	}
+}
+
+void scoreVis::render(smf::MidiFile midifile, double time) {
+	//GLint view[4];
 	{
-		InitPers(viewWidth_, viewHeight_, znear, depthResolution, intrinsic);
-		glGetIntegerv(GL_VIEWPORT, view);
+		//glGetIntegerv(GL_VIEWPORT, view);
 		double pos[6];
 		Eigen::Vector3d t_fix;
 		t_fix << tx_, ty_, tz_;
 		//spectrum
-		if (setSpec) {
-			glLineWidth(3.0);
-			glBegin(GL_LINES);
-			for (int i = minf_idx; i <= maxf_idx; i++) {
 
-				Eigen::Vector3d v1, v2, v3, v4;
-				double specpower = 10*log10( sqrt(spectrum[i] * spectrum[i])/specLen + 1);//base power setting
-				m->getpos((double)i/(maxf_idx- minf_idx), pos);
-
-
-				v1 << pos[0], pos[1], pos[2];
-				v2 << pos[0] + specpower * pos[3], pos[1] + specpower * pos[4], pos[2]+ specpower * pos[5];
-
-				//v1 = R.transpose() * (v1-t_fix);
-				//v2 = R.transpose() * (v2 - t_fix);
-
-				glColor3ub(linecolors[0], linecolors[1], linecolors[2]);
-				glVertex3f(v1(0), v1(1), v1(2));
-				glColor3ub(linecolors[0], linecolors[1], linecolors[2]);
-				glVertex3f(v2(0), v2(1), v2(2));
-
-			}
-			glEnd();
-		}
         //note drawing
 
 		Eigen::Vector3d t;
@@ -160,12 +167,18 @@ void scoreVis::render(smf::MidiFile midifile, GLubyte*& colorImage, double time)
 		
 	}
 	
-	colorImage = (GLubyte*)malloc(sizeof(GLubyte)*view[2] * view[3] * 3);
-	glReadPixels(view[0], view[1], view[2], view[3], GL_RGB, GL_UNSIGNED_BYTE, colorImage);
 
 
 }
 
+void scoreVis::bufferCopy(GLubyte*& colorImage) {
+	GLint view[4];
+	glGetIntegerv(GL_VIEWPORT, view);
+
+	colorImage = (GLubyte*)malloc(sizeof(GLubyte)*view[2] * view[3] * 3);
+	glReadPixels(view[0], view[1], view[2], view[3], GL_RGB, GL_UNSIGNED_BYTE, colorImage);
+
+}
 
 
 void scoreVis::InitPers(int viewWidth, int viewHeight, double znear, double depthResolution, double* intrinsic) {

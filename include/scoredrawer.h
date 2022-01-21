@@ -12,11 +12,18 @@
 class scoreVis {
 public:
 	scoreVis() {};
-	void render(smf::MidiFile midifile, GLubyte*& colorImage, double time);
+
+	void setView();
+	void render_spectrum();
+	void render(smf::MidiFile midifile, double time);
+
+	void bufferCopy(GLubyte*& colorImage);
+
 	void createContext(int view_w, int view_h);
 	void InitPers(int viewWidth, int viewHeight, double znear, double depthResolution, double* intrinsic);
 
 	void setMapping(mapping* m_) { m = m_; }
+	void setSpecMapping(mapping* m_) { m_f = m_; }
 	void setRotation(Eigen::Matrix3d R_) { R = R_; }
 	void setXYZ(double x, double y, double z) {
 		tx_ = x;
@@ -26,6 +33,8 @@ public:
 	void setSpeed(double speed) {
 		spd = speed;
 	}
+
+	
 	void setSpectrum(double* buffer, int n,int minf,int maxf) {
 		setSpec = true;
 		spectrum = buffer;
@@ -40,6 +49,8 @@ public:
 	unsigned char* linecolors;
 
 	mapping* m;
+	mapping* m_f;
+
 	Eigen::Matrix3d R;
 	double tx_;
 	double ty_;
