@@ -1,70 +1,20 @@
 #include "scoredrawer.h"
 
 void scoreVis::createContext(int view_w, int view_h) {
-	PIXELFORMATDESCRIPTOR _pfd = {
-sizeof(PIXELFORMATDESCRIPTOR),	//	Size of this struct
-1,	//	Versin of this structure
-PFD_DRAW_TO_BITMAP | PFD_SUPPORT_OPENGL |
-PFD_GENERIC_ACCELERATED,
-//		PFD_GENERIC_FORMAT,
-		//	Pixel buffer flags
-		PFD_TYPE_RGBA,	//	Type of pixel data
-		24,	//	The number of color bitplanes
-		0, 0, 0, 0, 0, 0,	//	Number of each color bitplanes and shift count
-		0, 0,	//	Number of alpha bitplanes and shift count
-		0, 0, 0, 0, 0,	//	Number of accumulation bits
-		32,	//	Z depth
-		0,	//	Stencil depth
-		0,	//	Number of auxiliary buffers
-		PFD_MAIN_PLANE,	//	Ignored
-		0,	//	Reserved
-		0,	//	Ignored
-		0,	//	Transparent color value
-		0,	//	Ignored
-	};
-	GLint view[4];
-	HDC		_hdc_ = CreateCompatibleDC(NULL);
-	//viewWidth_ = viewWidth_stat = view_w;
-	//viewHeight_ = viewHeight_stat = view_h;
+	viewWidth_ = view_w;
+	viewHeight_ = view_h;
 
-
-
-	DWORD m_DIBWidth = view_w;
-	DWORD m_DIBHeight = view_h;
-	DWORD m_BPP = 24;
-
-	// Create BITMAPINFOHEADER
-	BITMAPINFOHEADER* m_PBIH = new BITMAPINFOHEADER;
-	int iSize = sizeof(BITMAPINFOHEADER);
-	::memset(m_PBIH, 0, iSize);
-
-	m_PBIH->biSize = sizeof(BITMAPINFOHEADER);
-	m_PBIH->biWidth = m_DIBWidth;
-	m_PBIH->biHeight = m_DIBHeight;
-	m_PBIH->biPlanes = 1;
-	m_PBIH->biBitCount = m_BPP;
-	m_PBIH->biCompression = BI_RGB;
-
-	// Create DIB
-	void* m_PBits;
-	HBITMAP m_hbitmap_old;
-	HBITMAP m_hbitmap = ::CreateDIBSection(
-		_hdc_,
-		(BITMAPINFO*)m_PBIH, DIB_RGB_COLORS,
-		&m_PBits, NULL, 0
-	);
-
-	m_hbitmap_old = (HBITMAP)::SelectObject(_hdc_, m_hbitmap);
-	DWORD dwLength;
-	if ((m_DIBWidth * 3) % 4 == 0) /* �o�b�t�@�̂P���C���̒������v�Z */
-		dwLength = m_DIBWidth * 3;
-	else
-		dwLength = m_DIBWidth * 3 + (4 - (m_DIBWidth * 3) % 4);
-
-	int		_pfid = ChoosePixelFormat(_hdc_, &_pfd);
-	::SetPixelFormat(_hdc_, _pfid, &_pfd);
-	HGLRC	_hrc = ::wglCreateContext(_hdc_);
-	::wglMakeCurrent(_hdc_, _hrc);
+	if (::glfwInit() == GL_FALSE) {
+		std::cout << "glfwInit() error" << std::endl;
+		exit(0);
+	}
+	::glfwWindowHint(GLFW_VISIBLE, 0);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	win = ::glfwCreateWindow(view_w, view_h, "", NULL, NULL);
+	glfwMakeContextCurrent(win);
+	::glfwGetWindowSize(win, &viewWidth_, &viewHeight_);
+	std::cout << viewWidth_ << "," << viewHeight_ << std::endl;
 }
 
 void scoreVis::setView() {

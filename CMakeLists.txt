@@ -45,6 +45,11 @@ find_package(OpenGL REQUIRED)
 include_directories(${OPENGL_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME}  ${OPENGL_LIBRARIES})
 
+find_package(glfw3 REQUIRED)
+target_link_libraries(${PROJECT_NAME} glfw)
+
+
+
 find_package(Eigen3 REQUIRED)
 include_directories(
 	include

@@ -2,9 +2,19 @@
 #define _USE_MATH_DEFINES
 #include <iostream>
 #include <MidiFile.h>
+
+#if defined(_WIN32) || defined(_WIN64)
 #include <Windows.h>
-#include <gl\GL.h>
-#include <gl\GLU.h>
+#else
+// Linux and all others
+// Using GCC 4 where hiding attributes is possible
+//#include <GL/glew.h>
+#endif
+
+
+//#include <gl\GL.h>
+//#include <gl\GLU.h>
+#include <GLFW/glfw3.h>
 #include "Eigen/Eigen"
 #include "Eigen/Core"
 #include <mapping.h>
@@ -50,7 +60,7 @@ public:
 
 	mapping* m;
 	mapping* m_f;
-
+	GLFWwindow* win;
 	Eigen::Matrix3d R;
 	double tx_;
 	double ty_;
