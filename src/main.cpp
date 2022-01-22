@@ -3,9 +3,9 @@
 #include <MidiFile.h>
 #include <scoredrawer.h>
 #include <opencv2/opencv.hpp>
-#include <Windows.h>
-#include <gl\GL.h>
-#include <gl\GLU.h>
+//#include <Windows.h>
+//#include <gl\GL.h>
+//#include <gl\GLU.h>
 #include "Eigen/Eigen"
 #include "Eigen/Core"
 #include <sstream>

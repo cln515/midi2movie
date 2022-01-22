@@ -9,12 +9,11 @@ void scoreVis::createContext(int view_w, int view_h) {
 		exit(0);
 	}
 	::glfwWindowHint(GLFW_VISIBLE, 0);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	//glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	//glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	win = ::glfwCreateWindow(view_w, view_h, "", NULL, NULL);
 	glfwMakeContextCurrent(win);
 	::glfwGetWindowSize(win, &viewWidth_, &viewHeight_);
-	std::cout << viewWidth_ << "," << viewHeight_ << std::endl;
 }
 
 void scoreVis::setView() {

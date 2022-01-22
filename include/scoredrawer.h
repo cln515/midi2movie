@@ -4,7 +4,7 @@
 #include <MidiFile.h>
 
 #if defined(_WIN32) || defined(_WIN64)
-#include <Windows.h>
+//#include <Windows.h>
 #else
 // Linux and all others
 // Using GCC 4 where hiding attributes is possible
