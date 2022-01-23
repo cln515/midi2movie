@@ -218,18 +218,18 @@ int main(int argc, char* argv[]) {
 	}
 
 	std::vector<cv::Mat> bg(sources.size());
-	std::vector <double> dulations_bg(sources.size());
+	std::vector <double> durations_bg(sources.size());
 	std::vector <double> transition_duration(sources.size());
 	int bg_idx = 0;
 	if (setBG) {//background image loading
 		for (int i = 0; i < sources.size(); i++) {
 			
 			cv::resize(cv::imread(sources.at(i)["file"]), bg[i], cv::Size(vWidth, vHeight)); ;
-			if (!sources.at(i)["dulation"].is_null()) {
-				dulations_bg[i]=(sources.at(i)["dulation"].get<double>());
+			if (!sources.at(i)["duration"].is_null()) {
+				durations_bg[i]=(sources.at(i)["duration"].get<double>());
 			}
 			else {
-				dulations_bg[i] = (-1);
+				durations_bg[i] = (-1);
 			}
 			if (!sources.at(i)["transition"].is_null()) {
 				transition_duration[i] = (sources.at(i)["transition"].get<double>());
@@ -336,9 +336,9 @@ int main(int argc, char* argv[]) {
 			uchar* bg_ptr_next = bg.at(bg_idx).data; //bg.at(bg_idx).data;
 			double blend_rate = 1.0;
 			double trans_dur = transition_duration.at(bg_idx);
-			if (dulations_bg.at(bg_idx) != -1 && dulations_bg.at(bg_idx) - i < trans_dur) {
+			if (durations_bg.at(bg_idx) != -1 && durations_bg.at(bg_idx) - i < trans_dur) {
 				bg_ptr_next = bg.at(bg_idx+1).data;
-				blend_rate = (dulations_bg.at(bg_idx) - i)/ trans_dur;
+				blend_rate = (durations_bg.at(bg_idx) - i)/ trans_dur;
 				if (blend_rate < 0)blend_rate = 0;
 //				if (blend_rate > 1)blend_rate = 1;
 			}
@@ -363,7 +363,7 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
-			if (dulations_bg.at(bg_idx) != -1 && dulations_bg.at(bg_idx) - i < 0.0) {
+			if (durations_bg.at(bg_idx) != -1 && durations_bg.at(bg_idx) - i < 0.0) {
 				bg_idx++;
 			}
 		}
